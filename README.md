@@ -221,7 +221,7 @@ We provide a convenient script to build the Docker image.
     ```bash
     # This command starts an interactive session inside the container,
     # with the project directory mounted at /workspace.
-    docker run --gpus all --rm -it -v $(pwd):/workspace -w /workspace spatialvid:gpu-local bash
+    docker run --gpus all --rm -it -v $(pwd):/workspace -w /workspace spatialvid-gpu:latest bash
     ```
 
 #### Option 2: Manual Build and Run
@@ -230,9 +230,9 @@ You can also build and run the image using standard Docker commands from the roo
 
 1.  **Build the GPU image**:
     ```bash
-    docker build -f Dockerfile.gpu \
+    docker build -f Dockerfile \
       --build-arg NUM_JOBS=8 \
-      -t spatialvid:gpu:latest .
+      -t spatialvid-gpu:latest .
     ```
 
 2.  **Run the container**:
@@ -240,7 +240,7 @@ You can also build and run the image using standard Docker commands from the roo
     docker run --gpus all --rm -it \
       -v $(pwd):/workspace \
       -w /workspace \
-      spatialvid:gpu:latest bash
+      spatialvid-gpu:latest bash
     ```
 
 3.  **Verify the environment (inside the container)**:

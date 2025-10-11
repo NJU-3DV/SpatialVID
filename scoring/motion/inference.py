@@ -12,7 +12,7 @@ import queue
 import concurrent.futures
 from tqdm import tqdm
 
-FFMPEG_PATH = "/usr/local/bin/ffmpeg"
+FFMPEG_PATH = "/usr/bin/ffmpeg"
 
 
 def get_ffmpeg_acceleration():
@@ -57,15 +57,7 @@ def process_single_row(video_path, args, process_id):
             f"{process_id % args.gpu_num}",
         ]
     command += ["-i", f"{video_path}"]
-    if ACCELERATION_TYPE == "nvidia":
-        command += [
-            "-hwaccel",
-            "cuda",
-            "-hwaccel_output_format",
-            "cuda",
-            "-hwaccel_device",
-            f"{process_id % args.gpu_num}",
-        ]
+   
     command += ["-i", f"{video_path}"]
     if ACCELERATION_TYPE == "nvidia":
         command += [

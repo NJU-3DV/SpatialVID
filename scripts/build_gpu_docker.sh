@@ -16,7 +16,9 @@ while [ $# -gt 0 ]; do
       fi
       NUM_JOBS="$2"; shift 2;;
     --help|-h)
-      echo "Usage: $0 [--num-jobs N]"; exit 0;;
+      echo "Usage: $0 [--num-jobs N] [--gpu]"; exit 0;;
+    --gpu)
+      BUILD_WITH_GPU=1; shift;;
     *)
       # unknown; stop parsing
       break;;
@@ -58,10 +60,10 @@ IMAGE_TAG="spatialvid-gpu:latest"
 
 echo "[3/6] Building GPU image with Dockerfile (this may take a long time)..."
 # Pre-pull base images used by Dockerfile to fail early on network/auth issues
-# BUILDER_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04" # cuda:12.1.0-cudnn8-devel-ubuntu22.04
-# RUNTIME_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04" # cuda:12.1.1-cudnn8-runtime-ubuntu22.04
-BUILDER_IMAGE="cuda:12.1.0-cudnn8-devel-ubuntu22.04"
-RUNTIME_IMAGE="cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
+BUILDER_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04" # cuda:12.1.0-cudnn8-devel-ubuntu22.04
+RUNTIME_IMAGE="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.6.3-runtime-ubuntu22.04" # cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+# BUILDER_IMAGE="cuda:12.1.0-cudnn8-devel-ubuntu22.04"
+# RUNTIME_IMAGE="cuda:12.1.1-cudnn8-runtime-ubuntu22.04"
 
 echo "Pre-pulling base images to validate network/auth and warm cache:"
 retry_pull() {
@@ -85,12 +87,19 @@ retry_pull "${BUILDER_IMAGE}" || true
 retry_pull "${RUNTIME_IMAGE}" || true
 
 USE_BUILDX_CACHE=${USE_BUILDX_CACHE:-1}
+BUILD_WITH_GPU=${BUILD_WITH_GPU:-0}
+# Extra build args for GPU-enabled builds (passed to docker/buildx)
+BUILD_GPU_ARGS=""
+if [ "${BUILD_WITH_GPU}" = "1" ] || [ "${BUILD_WITH_GPU}" = "true" ]; then
+  echo "GPU build requested: will pass NVIDIA build args to docker build/buildx"
+  BUILD_GPU_ARGS="--build-arg=NVIDIA_VISIBLE_DEVICES=all --build-arg=NVIDIA_DRIVER_CAPABILITIES=compute,utility"
+fi
 # Prefer buildx/BuildKit if available for better output; otherwise fall back
 if docker buildx version >/dev/null 2>&1; then
   echo "docker buildx detected — using BuildKit for build"
   # Optional: allow overriding the BuildKit image used by the docker-container driver
-  BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-moby/buildkit:buildx-stable-1}" # moby/buildkit:buildx-stable-1
-  # BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/moby/buildkit:buildx-stable-1}" # moby/buildkit:buildx-stable-1
+  # BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-moby/buildkit:buildx-stable-1}" # moby/buildkit:buildx-stable-1
+  BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/moby/buildkit:buildx-stable-1}" # moby/buildkit:buildx-stable-1
 
   # If cache is requested, try to create/use a docker-container builder that can
   # use a custom BuildKit image (useful when Docker Hub is blocked and you have a private mirror).
@@ -134,13 +143,13 @@ if docker buildx version >/dev/null 2>&1; then
 
     DOCKER_BUILDKIT=1 docker buildx build ${BUILDX_BUILDER_ARG} --load --progress=plain \
       --cache-to type=local,dest=.buildx-cache --cache-from type=local,src=.buildx-cache \
-      --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
+      ${BUILD_GPU_ARGS} --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
   else
-  DOCKER_BUILDKIT=1 docker build --progress=plain --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
+  DOCKER_BUILDKIT=1 docker build --progress=plain ${BUILD_GPU_ARGS} --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
   fi
 else
   echo "docker buildx not detected — falling back to classic docker build"
-  docker build --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
+  docker build ${BUILD_GPU_ARGS} --build-arg NUM_JOBS=${NUM_JOBS} -f Dockerfile -t ${IMAGE_TAG} .
 fi
 
 echo "[4/6] Checking ffmpeg version inside built image"
