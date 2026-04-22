@@ -54,6 +54,40 @@ Parameters:
 - `--num_workers`: Number of parallel workers
 - `--wait_time`: Waiting time between API requests
 
+## Supported LLM Providers
+
+The annotation pipeline supports multiple LLM providers via the `--model`, `--api_key`, and `--base_domain` parameters:
+
+| Provider | `--base_domain` | Example `--model` |
+|----------|-----------------|-------------------|
+| **MiniMax** | `https://api.minimax.io/v1/` | `MiniMax-M2.7` or `MiniMax-M2.7-highspeed` |
+| Qwen (DashScope) | `https://dashscope.aliyuncs.com/` | `qwen3-30b-a3b` |
+| Gemini (proxy) | `https://cn2us02.opapi.win/` | `gemini-2.0-flash` |
+
+**Using MiniMax** (set `MINIMAX_API_KEY` env var or pass directly):
+
+```bash
+# LLM Captioning with MiniMax M2.7
+python caption/LLM/inference.py \
+  --csv_path path/to/data.csv \
+  --pose_load_dir path/to/poses \
+  --output_dir path/to/output \
+  --model MiniMax-M2.7 \
+  --api_key $MINIMAX_API_KEY \
+  --base_domain https://api.minimax.io/v1/
+
+# Tagging with MiniMax M2.7
+python caption/tagging/inference.py \
+  --csv_path path/to/data.csv \
+  --json_load_dir path/to/json \
+  --prompt_file caption/tagging/prompt.txt \
+  --model MiniMax-M2.7 \
+  --api_key $MINIMAX_API_KEY \
+  --base_domain https://api.minimax.io/v1/
+```
+
+MiniMax API keys can be obtained at [platform.minimax.io](https://platform.minimax.io). The `MiniMax-M2.7-highspeed` variant offers faster inference at the same quality.
+
 ### Step 3: Combine Results
 
 Merges the outputs from VQA and LLM steps into a unified format.
